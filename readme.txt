@@ -1,4 +1,4 @@
-=== Personal Welcome ===
+=== Simple User Admin ===
 Contributors: mrwiblog
 Donate link: http://www.stillbreathing.co.uk/donate/
 Tags: wordpress mu, user, blog, administration, management, simple, easy
