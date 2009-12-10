@@ -1,7 +1,7 @@
 === Simple User Admin ===
 Contributors: mrwiblog
 Donate link: http://www.stillbreathing.co.uk/donate/
-Tags: wordpress mu, user, blog, administration, management, simple, easy
+Tags: wordpress mu, buddypress, user, blog, administration, management, simple, easy
 Requires at least: 2.7
 Tested up to: 2.8.1
 Stable tag: 0.1
