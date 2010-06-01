@@ -2,7 +2,7 @@
 /*
 Plugin Name: Simple user management for Wordpress MU
 Description: Allows site administrators to manage which blogs belong to which users. The normal admin interface is bloated and (for me at least) very rarely works.
-Version: 1.1
+Version: 1.2
 Author: Chris Taylor
 Author URI: http://www.stillbreathing.co.uk
 Plugin URI: http://www.stillbreathing.co.uk/wordpress/simple-user-admin/
