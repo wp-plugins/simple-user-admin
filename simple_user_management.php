@@ -149,7 +149,7 @@ function simple_user_management()
 						';
 					
 						// show the add user to blog form
-						simple_user_management_show_add_user_to_blog_form($results);
+						simple_user_management_show_assign_blog_to_user_form($results);
 						
 					} else {
 					
@@ -333,13 +333,41 @@ function simple_user_management_get_user($id)
 	return get_userdata( $id );
 }
 
+// show the assign blog to user form
+function simple_user_management_show_assign_blog_to_user_form($blogs)
+{
+	echo '
+	<form action="wpmu-admin.php?page=simple_user_management&amp;user=' . $_GET["user"] . '" method="post">
+	<fieldset>
+	<p><label for="blog">Choose blog:</label>
+	<select name="blog" id="blog">
+	';
+	foreach ($blogs as $blog)
+	{
+		echo '
+		<option value="' . $blog->blog_id . '">' . $blog->domain . $blog->path . '</option>
+		';
+	}
+	echo '
+	</select></p>
+	<p><label for="role">Add user as:</label>
+	<select name="role" id="role">
+	' . simple_user_management_get_roles() . '
+	</select>
+	</p>
+	<p><button type="submit" name="saveuserroles" class="button">' . __("Add user to blog") . '</button></p>
+	</fieldset>
+	</form>
+	';
+}
+
 // show the add user to blog form
 function simple_user_management_show_add_user_to_blog_form($users)
 {
 	echo '
 	<form action="wpmu-admin.php?page=simple_user_management&amp;blog=' . $_GET["blog"] . '" method="post">
 	<fieldset>
-	<p><label for="blog">Choose user:</label>
+	<p><label for="user">Choose user:</label>
 	<select name="user" id="user">
 	';
 	foreach ($users as $user)
