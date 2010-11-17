@@ -3,7 +3,7 @@ Contributors: mrwiblog
 Donate link: http://www.stillbreathing.co.uk/donate/
 Tags: wordpress mu, buddypress, user, blog, administration, management, simple, easy
 Requires at least: 3.0
-Tested up to: 2.1
+Tested up to: 3.1
 Stable tag: 1.3
 
 Simple user admin is a WordPress MultiSite plugin that gives site administrators a simpler interface to manage blogs and users.
