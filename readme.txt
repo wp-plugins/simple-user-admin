@@ -3,8 +3,8 @@ Contributors: mrwiblog
 Donate link: http://www.stillbreathing.co.uk/donate/
 Tags: wordpress mu, buddypress, user, blog, administration, management, simple, easy
 Requires at least: 3.0
-Tested up to: 3.1
-Stable tag: 1.3
+Tested up to: 3.3
+Stable tag: 1.4
 
 Simple user admin is a WordPress MultiSite plugin that gives site administrators a simpler interface to manage blogs and users.
 
@@ -14,7 +14,7 @@ Simple user admin is a WordPress MultiSite plugin that gives site administrators
 
 The plugin also makes use of the __() function to allow for easy translation.
 
-Many thanks to Joost from http://yoast.com/ for fixing the plugin to work with MultiSite.
+Many thanks to Joost from http://yoast.com/ for fixing the plugin to work with MultiSite. Also thanks to Adam Dunson of http://www.cloudspace.com for lots of development work.
 
 == Installation ==
 
@@ -33,17 +33,27 @@ To scratch my own itch when developing [BeatsBase.com](http://beatsbase.co.uk "F
 
 == Changelog ==
 
+=== 1.4 (2011/09/09) ===
+
+Most of the development work for this version was done by Adam Dunson of http://www.cloudspace.com
+
+- Tightened security
+- Made the plugin run from the Network Users admin area
+- Made the search boxes more consistent across every page
+- Shows all users and blogs by default (pagination will be done for a future release)
+- Now shows custom roles, not just the standard roles
+
 === 1.3 (2010/11/17) ===
 
-Implemented fix for WordPress MultiSite
+- Implemented fix for WordPress MultiSite (thanks to Joost from http://yoast.com/)
 
 === 1.2 ===
 
-Fixed bug in blog search
+- Fixed bug in blog search
 
 === 1.1 ===
 
-Updated plugin URI
+- Updated plugin URI
 
 === 1.0 ===
 

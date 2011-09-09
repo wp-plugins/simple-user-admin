@@ -2,20 +2,42 @@
 /*
 Plugin Name: Simple User Management
 Description: Allows site administrators to eaily manage which blogs belong to which users, and which users to which blogs.
-Version: 1.3
+Version: 1.4
 Author: Chris Taylor
 Author URI: http://www.stillbreathing.co.uk
 Plugin URI: http://www.stillbreathing.co.uk/wordpress/simple-user-admin/
-Date: 2010-11-17
+Date: 2011-09-09
 */
 
 // when the admin menu is built
-add_action('admin_menu', 'simple_user_management_add_admin');
-add_action('admin_head', 'simple_user_management_show_css');
+add_action('network_admin_menu', 'simple_user_management_add_admin');
+add_action('network_admin_head', 'simple_user_management_show_css');
 
-// add the admin menu button
+// security check
+add_action('init', 'simple_user_management_security_check');
+
+define('SIMPLE_USER_MANAGEMENT_PARENT_SLUG', 'users.php');
+
+// add the admin menu button (based on the SIMPLE_USER_MANAGEMENT_PARENT_SLUG constant, currently underneath the Users menu)
 function simple_user_management_add_admin() {
-	add_submenu_page('ms-admin.php', 'Simple User Admin', 'Simple User Admin', 10, 'simple_user_management', 'simple_user_management');
+	add_submenu_page(SIMPLE_USER_MANAGEMENT_PARENT_SLUG, 'Simple User Management', 'Simple User Management', 10, 'simple_user_management', 'simple_user_management');
+}
+
+// security check
+function simple_user_management_security_check() {
+	// only do security check for this plugin
+	if ( isset( $_GET["page"] ) && $_GET["page"] == "simple_user_management" ) {
+	
+		// check when posting a form
+		if ( isset( $_POST ) && count( $_POST ) > 0 ) {
+			if (! wp_verify_nonce( $_POST["_wpnonce"], 'simple_user_management') ) wp_die('Your request failed the security check');
+		}
+		
+		// check when loading a blog or user		
+		if ( ( !isset( $_POST ) || count( $_POST ) == 0 ) && ( isset( $_GET["user"] ) || isset( $_GET["blog"] ) ) ) {
+			if (! wp_verify_nonce( $_GET["_wpnonce"] ) ) wp_die('Your request failed the security check');
+		}
+	}
 }
 
 // show the CSS
@@ -35,9 +57,12 @@ function simple_user_management_show_css()
 // show the admin screen
 function simple_user_management()
 {
-
 	echo '<div class="wrap">
-	<h2>' . __("Simple user management") . '</h2>';
+	<h2>' . __("Simple User Management") . '</h2>';
+
+	simple_user_management_show_search_forms();
+	echo '<br style="clear:both;" />';
+	
 	// if no action is being performed
 	if (@$_POST["userquery"] != "" && @$_GET["user"] == "" && @$_GET["blog"] == "")
 	{
@@ -50,16 +75,13 @@ function simple_user_management()
 		{
 			// show the table of users
 			simple_user_management_show_user_table($results);
-			
 		} else {
 			echo '
 			<p>' . __("No results found. Please search again.") . '</p>
 			';
-			
-			// show the search forms
-			simple_user_management_show_search_forms();
 		}
 	}
+
 	// if searching blogs
 	if (@$_POST["blogquery"] != "" && @$_GET["user"] == "" && @$_GET["blog"] == "")
 	{
@@ -72,17 +94,13 @@ function simple_user_management()
 		{
 			// show the table of blogs
 			simple_user_management_show_blog_table($results);
-			
 		} else {
-		
 			echo '
 			<p>' . __("No blogs found for your search. Please search again.") . '</p>
 			';
-			
-			// show the search forms
-			simple_user_management_show_search_forms();
 		}
 	}
+
 	// if managing a user
 	if (@$_GET["user"] != "")
 	{
@@ -163,6 +181,7 @@ function simple_user_management()
 		print simple_user_management_get_search_blogs_form("&amp;user=" . $_GET["user"]);
 			
 	}
+
 	// if managing a blog
 	if (@$_GET["blog"] != "")
 	{
@@ -206,7 +225,6 @@ function simple_user_management()
 		// if the blog has users
 		if ($users = get_users_of_blog((int)$_GET["blog"]))
 		{
-			// echo '<pre>'.print_r($users,1).'</pre>';
 			// show the table of blog users
 			simple_user_management_show_blog_users_table($_GET["blog"], $users);
 			
@@ -246,15 +264,19 @@ function simple_user_management()
 		}
 	}
 
+	// if nuffin (the default)
 	if (@$_POST["userquery"] == "" && @$_POST["blogquery"] == "" && @$_GET["user"] == "" && @$_GET["blog"] == "")
 	{
-		//
-	} else {
-		// if searching users	
-		echo '<h3>'.__('Edit another user or blog').'</h3>';
+		// display a table with all users
+		echo '<h3>' . __("All Users") . '</h3>';
+		$results = simple_user_management_search_users($_POST["userquery"]);
+		simple_user_management_show_user_table($results);
+
+		// display a table with all blogs
+		echo '<h3>' . __("All Blogs") . '</h3>';
+		$results = simple_user_management_search_blogs($_POST["blogquery"]);
+		simple_user_management_show_blog_table($results);
 	}
-	
-	simple_user_management_show_search_forms();
 	
 	echo '</div>';
 
@@ -286,9 +308,23 @@ function simple_user_management_remove_user_from_blog($userid, $blogid)
 function simple_user_management_get_user_role($user, $blogid, $id)
 {
 	global $wpdb;
-	$capabilities = $user->{$wpdb->base_prefix . $blogid . '_capabilities'};
-	if (!$capabilities || !is_array($capabilities)) $capabilities = array();
-	
+
+	// try the main blog for blog id 1
+	if ($blogid == 1) {
+		$capabilities = $user->{$wpdb->base_prefix . 'capabilities'};
+	} else {
+		$capabilities = $user->{$wpdb->base_prefix . $blogid . '_capabilities'};
+	}
+
+	if (!$capabilities || !is_array($capabilities)) {
+		$capabilities = $user->{$wpdb->base_prefix . $blogid . '_capabilities'};
+	}
+
+	// if it still isn't, just make it an array to avoid errors
+	if (!$capabilities || !is_array($capabilities)) {
+		$capabilities = array();
+	}
+
 	if ( !isset( $wp_roles ) )
 		$wp_roles = new WP_Roles();
 	$r = "";
@@ -342,7 +378,7 @@ function simple_user_management_get_user($id)
 function simple_user_management_show_assign_blog_to_user_form($blogs)
 {
 	echo '
-	<form action="ms-admin.php?page=simple_user_management&amp;user=' . $_GET["user"] . '" method="post">
+	<form action="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;user=' . $_GET["user"] ) . '" method="post">
 	<fieldset>
 	<p><label for="blog">Choose blog:</label>
 	<select name="blog" id="blog">
@@ -360,7 +396,8 @@ function simple_user_management_show_assign_blog_to_user_form($blogs)
 	' . simple_user_management_get_roles() . '
 	</select>
 	</p>
-	<p><button type="submit" name="saveuserroles" class="button">' . __("Add user to blog") . '</button></p>
+	<p><button type="submit" name="saveuserroles" class="button">' . __("Add user to blog") . '</button>
+	' . wp_nonce_field( 'simple_user_management' ) . '</p>
 	</fieldset>
 	</form>
 	';
@@ -370,7 +407,7 @@ function simple_user_management_show_assign_blog_to_user_form($blogs)
 function simple_user_management_show_add_user_to_blog_form($users)
 {
 	echo '
-	<form action="ms-admin.php?page=simple_user_management&amp;blog=' . $_GET["blog"] . '" method="post">
+	<form action="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;blog=' . $_GET["blog"] ) . '" method="post">
 	<fieldset>
 	<p><label for="user">Choose user:</label>
 	<select name="user" id="user">
@@ -388,7 +425,8 @@ function simple_user_management_show_add_user_to_blog_form($users)
 	' . simple_user_management_get_roles() . '
 	</select>
 	</p>
-	<p><button type="submit" name="saveuserroles" class="button">' . __("Add user to blog") . '</button></p>
+	<p><button type="submit" name="saveuserroles" class="button">' . __("Add user to blog") . '</button>
+	' . wp_nonce_field( 'simple_user_management' ) . '</p>
 	</fieldset>
 	</form>
 	';
@@ -398,7 +436,7 @@ function simple_user_management_show_add_user_to_blog_form($users)
 function simple_user_management_show_user_blogs_table($user, $results)
 {
 	echo '
-	<form action="ms-admin.php?page=simple_user_management&amp;user=' . $_GET["user"] . '" method="post">
+	<form action="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;user=' . $_GET["user"] ) . '" method="post">
 	<table class="widefat" cellspacing="0">
 	<thead>
 		<tr>
@@ -417,10 +455,10 @@ function simple_user_management_show_user_blogs_table($user, $results)
 		$blogids .= $blog->userblog_id . ",";
 		echo '
 		<tr>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;blog=' . $blog->userblog_id . '">' . $blog->userblog_id . '</a></td>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;blog=' . $blog->userblog_id . '">' . stripslashes($blog->blogname ) . '</a></td>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;blog=' . $blog->userblog_id . '">' . $blog->domain . '</a></td>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;blog=' . $blog->userblog_id . '">' . $blog->path . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;blog=' . $blog->userblog_id ) . '">' . $blog->userblog_id . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;blog=' . $blog->userblog_id ) . '">' . stripslashes($blog->blogname ) . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;blog=' . $blog->userblog_id ) . '">' . $blog->domain . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;blog=' . $blog->userblog_id ) . '">' . $blog->path . '</a></td>
 			<td>
 			<select name="role_' . $blog->userblog_id . '">' . simple_user_management_get_user_role($user, $blog->userblog_id, $blog->userblog_id) . '</select>
 			</td>
@@ -431,7 +469,8 @@ function simple_user_management_show_user_blogs_table($user, $results)
 	</tbody>
 	</table>
 	<p><button type="submit" name="saveuserroles" class="button">' . __("Save user roles") . '</button>
-	<input type="hidden" name="blogids" value="' . trim($blogids, ",") . '" /></p>
+	<input type="hidden" name="blogids" value="' . trim($blogids, ",") . '" />
+	' . wp_nonce_field( 'simple_user_management' ) . '</p>
 	</form>
 	';
 }
@@ -440,7 +479,7 @@ function simple_user_management_show_user_blogs_table($user, $results)
 function simple_user_management_show_blog_users_table($blog, $results)
 {
 	echo '
-	<form action="ms-admin.php?page=simple_user_management&amp;blog=' . $_GET["blog"] . '" method="post">
+	<form action="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;blog=' . $_GET["blog"] ) . '" method="post">
 	<table class="widefat" cellspacing="0">
 	<thead>
 		<tr>
@@ -460,10 +499,10 @@ function simple_user_management_show_blog_users_table($blog, $results)
 		$userids .= $user->ID . ",";
 		echo '
 		<tr>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;user=' . $user->ID . '">' . $user->ID . '</a></td>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;user=' . $user->ID . '">' . stripslashes($user->user_login ) . '</a></td>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;user=' . $user->ID . '">' . stripslashes( $user->display_name ) . '</a></td>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;user=' . $user->ID . '">' . $user->user_email . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;user=' . $user->ID ) . '">' . $user->ID . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG.'?page=simple_user_management&amp;user=' . $user->ID ) . '">' . stripslashes($user->user_login ) . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;user=' . $user->ID ) . '">' . stripslashes( $user->display_name ) . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG.'?page=simple_user_management&amp;user=' . $user->ID ) . '">' . $user->user_email . '</a></td>
 			<td>
 			<select name="role_' . $user->ID . '">' . simple_user_management_get_user_role($user, (int)$_GET["blog"], $user->ID) . '</select>
 			</td>
@@ -474,7 +513,8 @@ function simple_user_management_show_blog_users_table($blog, $results)
 	</tbody>
 	</table>
 	<p><button type="submit" name="saveuserroles" class="button">' . __("Save user roles") . '</button>
-	<input type="hidden" name="userids" value="' . trim($userids, ",") . '" /></p>
+	<input type="hidden" name="userids" value="' . trim($userids, ",") . '" />
+	' . wp_nonce_field( 'simple_user_management' ) . '</p>
 	</form>
 	';
 }
@@ -498,10 +538,10 @@ function simple_user_management_show_user_table($users)
 	{
 		echo '
 		<tr>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;user=' . $user->id . '">' . $user->id . '</a></td>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;user=' . $user->id . '">' . stripslashes($user->display_name) . '</a></td>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;user=' . $user->id . '">' . $user->user_login . '</a></td>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;user=' . $user->id . '">' . $user->user_email . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;user=' . $user->id ) . '">' . $user->id . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;user=' . $user->id ) . '">' . stripslashes($user->display_name) . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;user=' . $user->id ) . '">' . $user->user_login . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;user=' . $user->id ) . '">' . $user->user_email . '</a></td>
 		</tr>
 		';
 	}
@@ -515,11 +555,17 @@ function simple_user_management_show_user_table($users)
 function simple_user_management_search_blogs($query)
 {
 	global $wpdb;
-	$sql = "select blog_id, domain, path
-			from " . $wpdb->blogs . "
-			where blog_id = " . $wpdb->escape((int)$query) . "
-			or domain like '%" . $wpdb->escape($query) . "%'
-			or path like '%" . $wpdb->escape($query) . "%';";
+	if (!empty($query)) {
+		$sql = "select blog_id, domain, path
+				from " . $wpdb->blogs . "
+				where blog_id = " . $wpdb->escape((int)$query) . "
+				or domain like '%" . $wpdb->escape($query) . "%'
+				or path like '%" . $wpdb->escape($query) . "%';";
+	} else {
+		// select them all!
+		$sql = "select blog_id, domain, path
+				from " . $wpdb->blogs . ";";
+	}
 	return $wpdb->get_results($sql);
 }
 
@@ -542,9 +588,9 @@ function simple_user_management_show_blog_table($blogs)
 	{
 		echo '
 		<tr>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;blog=' . $blog->blog_id . '">' . $blog->blog_id . '</a></td>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;blog=' . $blog->blog_id . '">' . $blog->domain . '</a></td>
-			<td><a href="ms-admin.php?page=simple_user_management&amp;blog=' . $blog->blog_id . '">' . $blog->path . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;blog=' . $blog->blog_id ) . '">' . $blog->blog_id . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;blog=' . $blog->blog_id ) . '">' . $blog->domain . '</a></td>
+			<td><a href="' . wp_nonce_url( SIMPLE_USER_MANAGEMENT_PARENT_SLUG . '?page=simple_user_management&amp;blog=' . $blog->blog_id ) . '">' . $blog->path . '</a></td>
 			<td><a href="http://' . $blog->domain . $blog->path . '">http://' . $blog->domain . $blog->path . '</a></td>
 		</tr>
 		';
@@ -559,12 +605,18 @@ function simple_user_management_show_blog_table($blogs)
 function simple_user_management_search_users($query)
 {
 	global $wpdb;
-	$sql = "select id, display_name, user_login, user_email
-			from " . $wpdb->users . "
-			where id = " . $wpdb->escape((int)$query) . "
-			or display_name like '%" . $wpdb->escape($query) . "%'
-			or user_login like '%" . $wpdb->escape($query) . "%'
-			or user_email like '%" . $wpdb->escape($query) . "%';";
+	if (!empty($query)) {
+		$sql = "select id, display_name, user_login, user_email
+				from " . $wpdb->users . "
+				where id = " . $wpdb->escape((int)$query) . "
+				or display_name like '%" . $wpdb->escape($query) . "%'
+				or user_login like '%" . $wpdb->escape($query) . "%'
+				or user_email like '%" . $wpdb->escape($query) . "%';";
+	} else {
+		// select them all!
+		$sql = "select id, display_name, user_login, user_email
+				from " . $wpdb->users . ";";
+	}
 	return $wpdb->get_results($sql);
 }
 
@@ -587,12 +639,13 @@ function simple_user_management_show_search_forms()
 function simple_user_management_get_search_blogs_form($qs = "")
 {
 	return '
-		<form action="ms-admin.php?page=simple_user_management' . $qs . '#results" method="post">
+		<form action="'.SIMPLE_USER_MANAGEMENT_PARENT_SLUG.'?page=simple_user_management' . $qs . '#results" method="post">
 			<fieldset>
 			<p><label for="blogquery">' . __("Search for:") . '</label>
 			<input type="text" name="blogquery" id="blogquery" /></p>
 			<p>' . __("You can search on blog IDs, domains and paths.") . '</p>
-			<p class="submit"><input type="submit" name="submit" value="' . ("Search &raquo;") . '" /></p>
+			<p class="submit"><input type="submit" name="submit" value="' . ("Search &raquo;") . '" />
+			' . wp_nonce_field( 'simple_user_management' ) . '</p>
 			</fieldset>
 		</form>
 	';
@@ -602,12 +655,13 @@ function simple_user_management_get_search_blogs_form($qs = "")
 function simple_user_management_get_search_users_form($qs = "")
 {
 	return '
-		<form action="ms-admin.php?page=simple_user_management' . $qs . '#results" method="post">
+		<form action="'.SIMPLE_USER_MANAGEMENT_PARENT_SLUG.'?page=simple_user_management' . $qs . '#results" method="post">
 			<fieldset>
 			<p><label for="userquery">' . __("Search for:") . '</label>
 			<input type="text" name="userquery" id="userquery" /></p>
 			<p>' . __("You can search on user IDs, user logins, display names and email addresses.") . '</p>
-			<p class="submit"><input type="submit" name="submit" value="' . ("Search &raquo;") . '" /></p>
+			<p class="submit"><input type="submit" name="submit" value="' . ("Search &raquo;") . '" />
+			' . wp_nonce_field( 'simple_user_management' ) . '</p>
 			</fieldset>
 		</form>
 	';
